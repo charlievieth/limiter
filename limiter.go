@@ -132,6 +132,7 @@ func (l *Limiter) Stop() (err error) {
 // Unlock can be used to pause/unpause the loop.
 func startLimiter(l *Limiter) {
 	l.state(limiterActive)
+	defer l.state(limiterStopped)
 	for {
 		select {
 		case <-l.t.C:
@@ -141,7 +142,6 @@ func startLimiter(l *Limiter) {
 			l.locker <- struct{}{}
 			l.state(limiterActive)
 		case <-l.stop:
-			l.state(limiterStopped)
 			l.stop <- struct{}{}
 			return
 		}
