@@ -13,8 +13,9 @@ const (
 	limiterStopped
 )
 
-// A Limiter continuously executes a function for each interval of a time duration.  The function
-// executed and duration can be changed on the fly, and a Limiter can be stopped and restarted.
+// A Limiter can continuously execute an anonymous function (specifically a method) for each
+// interval of the given time duration.  The function executed and the duration can be changed on
+// the fly, and a Limiter can be stopped and restarted.
 type Limiter struct {
 	// TODO: add delay() & delayFunc(...interface{}) interface{}
 	d      time.Duration
