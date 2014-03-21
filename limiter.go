@@ -72,26 +72,6 @@ func (l *Limiter) unlock() {
 	<-l.locker
 }
 
-// Active returns true if the limiter is running and not locked.
-func (l *Limiter) Active() bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.s == Active
-}
-
-// Locked returns true if the limiter is locked.
-func (l *Limiter) Locked() bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.s == Locked
-}
-
-func (l *Limiter) stopped() bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.s == Stopped
-}
-
 // Reset, resets the limiter's interval and function, and restarts a stopped limiter.  Reset
 // returns an error if d (time.Duration) is non-positive or the limiter is locked.
 func (l *Limiter) Reset(d time.Duration, fn func()) error {
@@ -141,7 +121,7 @@ func (l *Limiter) Stop() (err error) {
 	if l.State() == Stopped {
 		return errors.New("Limiter already stopped")
 	}
-	if l.State() == Locked() {
+	if l.State() == Locked {
 		l.unlock()
 	}
 
