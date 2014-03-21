@@ -9,7 +9,11 @@ import (
 )
 
 const (
+<<<<<<< HEAD
 	Asleep = iota
+=======
+	Asleep = iota // Asleep signals an uninitialized Limiter
+>>>>>>> development
 	Active
 	Locked
 	Stopped
@@ -65,11 +69,16 @@ func (l *Limiter) State() int {
 func (l *Limiter) lock() { l.locker <- struct{}{} }
 
 // unlock, unlocks the Limiter's main loop. unlock panics if the Limiter is not locked.
+<<<<<<< HEAD
 func (l *Limiter) unlock() error {
+=======
+func (l *Limiter) unlock() {
+>>>>>>> development
 	if l.State() == Locked {
 		panic(errors.New("cannot unlock an unlocked Limiter"))
 	}
 	<-l.locker
+<<<<<<< HEAD
 	return nil
 }
 
@@ -91,6 +100,8 @@ func (l *Limiter) stopped() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.s == Stopped
+=======
+>>>>>>> development
 }
 
 // Reset, resets the limiter's interval and function, and restarts a stopped limiter.  Reset
@@ -138,7 +149,15 @@ func (l *Limiter) Stop() (err error) {
 	// arbitrary duration for timeout
 	const to = time.Second * 10
 
+<<<<<<< HEAD
 	if l.Locked() {
+=======
+	// check Limiter state before proceeding
+	if l.State() == Stopped {
+		return errors.New("Limiter already stopped")
+	}
+	if l.State() == Locked {
+>>>>>>> development
 		l.unlock()
 	}
 
