@@ -1,7 +1,5 @@
 package limiter
 
-// DEVELOPMENT BRANCH
-
 import (
 	"errors"
 	"sync"
