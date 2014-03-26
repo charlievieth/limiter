@@ -1,3 +1,4 @@
+// Package limiter provides flexible and thread-safe rate limiters.
 package limiter
 
 import (

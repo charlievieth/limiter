@@ -5,6 +5,15 @@ import (
 	"time"
 )
 
+// Status: incomplete
+// NB: most of these tests are based on tick_test.go
+
+// TODO:
+// 	- Add tests for Bucket and Ticker
+// 	- Stress test Limiter
+//  - Test that the changes made within Bucket.Reset() do not cause an error
+//  - Refactor - this is really ugly
+
 func TestNewLimiter(t *testing.T) {
 	const Count = 10
 	Delta := 100 * time.Millisecond
