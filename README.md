@@ -1,6 +1,5 @@
 limiter
 =======
 
-Limiter is a Go package that implements a rate limiter that executes a function on each interval of a given duration.
+Package limiter provides flexible and thread-safe rate limiters.
 
-This package is currently under development.
