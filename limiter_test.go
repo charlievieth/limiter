@@ -5,21 +5,18 @@ import (
 	"time"
 )
 
-// dummy struct for benchmarking limiter
-type dummy struct{ c chan int }
-
-// dummy method for benchmarking limiter
-func (d *dummy) do() { d.c <- 1 }
-
-func TestLimiter(t *testing.T) {
+func TestNewLimiter(t *testing.T) {
 	const Count = 10
 	Delta := 100 * time.Millisecond
-	c := make(chan int)
-	d := &dummy{c}
+	c := make(chan time.Time)
+	var fn func()
+	fn = func() {
+		c <- time.Now()
+	}
 	t0 := time.Now()
-	limiter := NewLimiter(Delta, d.do)
+	limiter := NewLimiter(Delta, fn, true)
 	for i := 0; i < Count; i++ {
-		<-d.c
+		<-c
 	}
 	limiter.Stop()
 	t1 := time.Now()
@@ -29,24 +26,100 @@ func TestLimiter(t *testing.T) {
 	if dt < target-slop || (!testing.Short() && dt > target+slop) {
 		t.Fatalf("%d %s ticks took %s, expected [%s,%s]", Count, Delta, dt, target-slop, target+slop)
 	}
-	time.Sleep(2 * Delta)
 	select {
-	case <-d.c:
-		t.Fatal("Limiter did not shut down")
+	case <-c:
+		t.Fatal("NewLimiter did not stop\n")
 	default:
 		// ok
 	}
 }
 
-func BenchmarckLimiter(b *testing.B) {
-	c := make(chan int)
-	d := dummy{c}
-	limiter := NewLimiter(1, d.do)
-	b.ResetTimer()
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		<-d.c
+func TestLimiterState(t *testing.T) {
+	// NB: delay has been reduced since last test
+	// what is the minimum delay value ???
+	const divisor = 100
+	Delta := 100 * time.Millisecond
+	delay := Delta / divisor
+
+	c := make(chan time.Time)
+	var fn func()
+	fn = func() {
+		c <- time.Now()
 	}
-	b.StopTimer()
-	limiter.Stop()
+	lim := NewLimiter(Delta, fn, true)
+
+	time.Sleep(delay)
+	if s := lim.State(); s != Active {
+		t.Fatalf("invalid state %d expected %d\n", s, Active)
+	}
+
+	if err := lim.Stop(); err != nil {
+		t.Fatalf("stop returned error: %s\n", err)
+	}
+	time.Sleep(delay)
+	if s := lim.State(); s != Stopped {
+		t.Fatalf("invalid state %d expected %d\n", s, Stopped)
+	}
+
+	lim.Reset(Delta, fn, true)
+	time.Sleep(delay)
+	if s := lim.State(); s != Active {
+		t.Fatalf("after restart, invalid state %d expected %d\n", s, Active)
+	}
+
+	if err := lim.Stop(); err != nil {
+		t.Fatalf("stop returned error: %s\n", err)
+	}
+	time.Sleep(delay)
+	if s := lim.State(); s != Stopped {
+		t.Fatalf("after restart, invalid state %d expected %d\n", s, Stopped)
+	}
+
+}
+
+func TestLimiterReset(t *testing.T) {
+	// Loosely based on pkg/time's tests
+	// This is really really ugly
+	const (
+		Count   = 10
+		divisor = 10
+		// multiplyer = 2
+	)
+	Delta0 := 100 * time.Millisecond
+	Delta1 := 200 * time.Millisecond
+	c := make(chan time.Time)
+	var fn func()
+	fn = func() {
+		c <- time.Now()
+	}
+	lim := NewLimiter(Delta0, fn, true)
+
+	t0 := time.Now()
+	for i := 0; i < Count; i++ {
+		<-c
+	}
+	t1 := time.Now()
+	lim.Reset(Delta1, fn, true)
+	t2 := time.Now()
+	for i := 0; i < Count; i++ {
+		<-c
+	}
+	t3 := time.Now()
+	if err := lim.Stop(); err != nil {
+		t.Fatalf("Stop returned error: %s\n", err)
+	}
+	dt0 := t1.Sub(t0)
+	dt1 := t3.Sub(t2)
+	target0 := Delta0 * Count
+	target1 := Delta1 * Count
+	slop0 := target0 / divisor
+	slop1 := target1 / divisor
+
+	msgFmt := "Test %d: %d %s ticks took %s, expected [%s,%s]"
+	if dt0 < target0-slop0 || (!testing.Short() && dt0 > target0+slop0) {
+		t.Fatalf(msgFmt, 0, Count, Delta0, dt0, target0-slop0, target0+slop0)
+	}
+	if dt1 < target1-slop1 || (!testing.Short() && dt1 > target1+slop1) {
+		t.Fatalf(msgFmt, 1, Count, Delta1, dt1, target1-slop1, target1+slop1)
+	}
 }
