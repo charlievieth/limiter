@@ -445,11 +445,19 @@ func (b *Bucket) Withdraw(n int) error {
 // restart a stopped token bucket.  An error is returned if either n or d are
 // less than zero.
 func (b *Bucket) Reset(n int, d time.Duration) error {
-	// WARN: Changes here are made being made on a unlocked (live) Bucket.
 	if n <= 0 {
 		return errors.New("non-positive value n for Bucket capacity")
 	}
-	b.capacity = n
+
+	// do not defer call to unlock here, doing so would cause b.reset to block
+	if b.State() != Stopped {
+		b.lock()
+		b.capacity = n
+		b.unlock()
+	} else {
+		b.capacity = n
+	}
+
 	if n == 1 {
 		return b.reset(d, b.fillOne, false)
 	} else {
