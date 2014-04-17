@@ -6,7 +6,7 @@ import (
 )
 
 // Status: incomplete
-// NB: most of these tests are based on tick_test.go
+// NB: most of these tests are based on src/pkg/time/tick_test.go
 
 // TODO:
 // 	- Add tests for Bucket and Ticker
