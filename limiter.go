@@ -35,7 +35,7 @@ type Limiter struct {
 
 	// lock/state control
 	locker chan struct{} // lock semaphore
-	stop   chan struct{} // stop semaphore
+	stop   chan struct{} // stop semaphore, close this channel to stop startLimiter
 	mu     *sync.Mutex   // mutual exclusion lock for thread safe state changes
 }
 
@@ -348,12 +348,11 @@ type Bucket struct {
 	capacity int
 	tokens   chan struct{}
 	*Limiter
-	// fill     func(*Bucket)
 }
 
 // NewBucket returns a new Bucket (token bucket) with capacity i, and a refill
-// period of duration d.
-// NewBucket panics if i or d are less than or equal to zero.
+// period of duration d.  NewBucket panics if i or d are less than or equal to
+// zero.
 func NewBucket(n int, d time.Duration) *Bucket {
 	if n <= 0 {
 		panic(errors.New("non-positive value n for Bucket capacity"))
@@ -370,26 +369,39 @@ func NewBucket(n int, d time.Duration) *Bucket {
 	return b
 }
 
+// fillOne, fills a token bucket with a capacity of one without the overhead
+// of setting up a loop - as in fillMany.
 func (b *Bucket) fillOne() {
+	// TODO: profile fillOne vs. fillMany, if the difference is negligible
+	// remove fillOne and replace with fillMany (more idiomatic)
 	select {
 	case b.tokens <- struct{}{}:
 	default:
+		// bucket full, drop token
 	}
 }
 
+// fillMany, fills a token bucket with a capacity greater than one.
 func (b *Bucket) fillMany() {
 	for i := 0; i < b.capacity; i++ {
 		select {
 		case b.tokens <- struct{}{}:
 		default:
+			// bucket full, drop remaining tokens and return
 			return
 		}
 	}
 }
 
-// Withdraw blocks until n tokens have been withdrawn from the Buckket.  An
-// error is returned if the bucket is stopped before the withdraw completes.
+// Withdraw blocks until n tokens have been withdrawn from the Bucket.  If n is
+// less than one Withdraw returns immediately, n can be greater than the
+// Buckets capacity.
+//
+// An error is returned if the bucket is stopped before the withdraw completes.
 func (b *Bucket) Withdraw(n int) error {
+	if n < 1 {
+		return nil
+	}
 	for i := 0; i < n; i++ {
 		select {
 		case <-b.tokens:
