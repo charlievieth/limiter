@@ -343,11 +343,18 @@ func (t *Ticker) Reset(d time.Duration) error {
 	return t.reset(d, nil, nil)
 }
 
+// withdraw operation
+type wdOp struct {
+	n   int        // number of tokens to consume
+	res chan error // response channel
+}
+
 // A Bucket is a convenience wrapper for Limiter that implements a token bucket.
 type Bucket struct {
-	capacity int
-	tokens   chan struct{}
-	*Limiter
+	capacity int           // bucket capacity
+	tokens   chan struct{} // buffered channel of tokens
+	queue    chan *wdOp    // withdraw queue
+	*Limiter               // anonymous Limiter field
 }
 
 // NewBucket returns a new Bucket (token bucket) with capacity i, and a refill
@@ -357,16 +364,38 @@ func NewBucket(n int, d time.Duration) *Bucket {
 	if n <= 0 {
 		panic(errors.New("non-positive value n for Bucket capacity"))
 	}
-	b := &Bucket{}
 	t := make(chan struct{}, n)
-	b.tokens = t
-	b.capacity = n
+	q := make(chan *wdOp)
+	b := &Bucket{
+		capacity: n,
+		tokens:   t,
+		queue:    q,
+	}
 	if n == 1 {
 		b.Limiter = NewLimiter(d, b.fillOne, false)
 	} else {
 		b.Limiter = NewLimiter(d, b.fillMany, false)
 	}
+	go handleQueue(b)
 	return b
+}
+
+// handleQueue processes withdraw transactions (wdOp) from a Buckets queue
+func handleQueue(b *Bucket) {
+	// NB: for now lets not shutdown handleQueue when Bucket is stopped
+Loop:
+	for w := range b.queue {
+		for i := 0; i < w.n; i++ {
+			select {
+			case <-b.stop:
+				w.res <- errors.New("Bucket stopped before withdraw completed")
+				break Loop
+			case <-b.tokens:
+				// consume token
+			}
+		}
+		w.res <- nil
+	}
 }
 
 // fillOne, fills a token bucket with a capacity of one without the overhead
@@ -402,14 +431,14 @@ func (b *Bucket) Withdraw(n int) error {
 	if n < 1 {
 		return nil
 	}
-	for i := 0; i < n; i++ {
-		select {
-		case <-b.tokens:
-		case <-b.stop:
-			return errors.New("Bucket stopped before withdraw completed")
-		}
+	wd := &wdOp{n: n}
+	select {
+	case <-b.stop:
+		return errors.New("Bucket stopped, cannot withdraw")
+	case b.queue <- wd:
 	}
-	return nil
+	err := <-wd.res
+	return err
 }
 
 // Reset changes the token bucket's capacity and duration values, and will
