@@ -124,13 +124,13 @@ func (l *Limiter) State() int {
 //
 // An error is returned if the stop channel is closed, this is to prevent calls
 // made while the Limiter is in the process of stopping from succeeding.
-func (l *Limiter) lock() (err error) {
+func (l *Limiter) lock() error {
 	select {
 	case l.locker <- struct{}{}:
 	case <-l.stop:
-		err = errors.New("limiter stopped")
+		return errors.New("limiter stopped")
 	}
-	return
+	return nil
 }
 
 // unlock, unlocks the Limiter's main loop.  Any function that acquires a lock
@@ -279,9 +279,8 @@ func (l *Limiter) Delay(delay, duration time.Duration) error {
 // DelayFunc delays the Limiter's period by the duration returned from DelayFunc
 // fn until the duration returned from fn is less than or equal to zero.
 // An error is returned if the Limiter is stopped.
-func (l *Limiter) DelayFunc(fn DelayFunc) (err error) {
-	err = l.newDelay(fn)
-	return
+func (l *Limiter) DelayFunc(fn DelayFunc) error {
+	return l.newDelay(fn)
 }
 
 // newDelay, adds a limiter with DelayFunc fn to Limiter.  The Limiter will call
@@ -460,7 +459,6 @@ func (b *Bucket) Reset(n int, d time.Duration) error {
 
 	if n == 1 {
 		return b.reset(d, b.fillOne, false)
-	} else {
-		return b.reset(d, b.fillMany, false)
 	}
+	return b.reset(d, b.fillMany, false)
 }
